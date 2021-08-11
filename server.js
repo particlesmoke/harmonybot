@@ -6,7 +6,7 @@ const TelegramBot = require('node-telegram-bot-api')
 const { title } = require('process')
 const token = '1900703486:AAElE2nXiShEtnkkqi-43GJ4fzcPEMw-HS8'
 const bot = new TelegramBot(token, {polling: true})
-bot.setMyCommands([{command: "search", description:"Search for music"}])
+bot.setMyCommands([{command: "search", description:"Search for artist/album/song"}, {command: "song", description:"Download a song"}])
 
 async function sendmusicbyname(name, chatid, messageid) {
   const browser = await puppeteer.launch({ headless: true});
@@ -47,7 +47,7 @@ async function sendmusicbyname(name, chatid, messageid) {
 
 
 async function sendmusicbyurl(youtubelink, chatid){
-  const browser = await puppeteer.launch({ headless: false});
+  const browser = await puppeteer.launch({ headless: true});
   try{
     console.log("Browser launched")
     const page = await browser.newPage()
@@ -74,18 +74,21 @@ async function sendmusicbyurl(youtubelink, chatid){
   }
 }
 async function sendsearchresults(name, chatid, messageid, iteration, num = 9){
-  var songs = await getsongs(name, num, iteration)
+  var songs = await getsongs(name, num + (iteration==3?1:0), iteration)
   var reply = ""
   var buttons = [[]]
   let i = 0
-  for(i = 0; i<songs.length; i++){
+  for(i = 0; i<songs.length ; i++){
     reply+= `|${i+1 + (iteration-1)*num}|` + songs[i].title+"\n"
     buttons[Math.floor(i/5)].push({text:String(i+1 + (iteration-1)*num), callback_data:songs[i].youtubelink})
     if((i+1)%5 == 0){
       buttons.push([])
     }
   }
-  buttons[Math.floor(i/5)].push({text:"More", callback_data:`/${name}/`+String(iteration+1)})
+  reply+="\n" + "Click on the song number you want to download" 
+  if(iteration<3){
+    buttons[Math.floor(i/5)].push({text:"More", callback_data:`/${name}/`+String(iteration+1)})
+  }
   bot.sendMessage(chatid, reply, {reply_to_message_id: messageid, reply_markup: { inline_keyboard: buttons }})
 }
 
@@ -102,21 +105,31 @@ bot.on('callback_query', async query=>{
 })
 
 bot.on('message', async message=>{
-  console.log(message)
-  if(message.text.startsWith('/')){ //do this with entities
+  // console.log(message)
+  console.log( `${message.from.first_name} ${message.from.last_name} says ${message.text}`)
+  if('entities' in message && message.entities[0].type == 'bot_command'){ //do this with entities
     if(message.text=="/start"){
       bot.sendMessage(message.from.id, "Just send me the name of a song, and I'll try to get it to you : )")
     }
     else if(message.text.startsWith("/search")){
-      console.log(message.text)
-      sendsearchresults(message.text.slice(8), message.from.id, message.message_id, 1)
+      bot.sendMessage(message.from.id, "What do you want to search for?")
+      bot.once('message', message=>{
+        sendsearchresults(message.text, message.from.id, message.message_id, 1)
+      })
+    }
+    else if(message.text.startsWith("/song")){
+      console.log("song requested")
+      bot.sendMessage(message.from.id, "Which song are you looking for?")
+      bot.once('message', message=>{
+        sendmusicbyname(message.text, message.from.id, message.message_id)
+      })
     }
   }
   else{
-    bot.sendMessage(message.from.id, "Please wait")
-    sendmusicbyname(message.text, message.from.id, message.message_id)
+    // bot.sendMessage(message.from.id, "Please wait")
+    // sendmusicbyname(message.text, message.from.id, message.message_id)
+    
   }
-  console.log( `${message.from.first_name} ${message.from.last_name} says ${message.text}`)
 })
 
 
@@ -127,9 +140,7 @@ async function getsongs(input, num = 10, iteration = 1){
       searchterm+= (input[i]+'+')
   }
   searchterm+=input[input.length-1]
-  console.log("Getting results for")
-  console.log(searchterm)
-  console.log(num*iteration)
+  console.log("Getting results for "+searchterm)
   const res = await request('https://youtube.com/results?search_query='+searchterm)
   var songs = []
   var html = String(res)
@@ -142,7 +153,7 @@ async function getsongs(input, num = 10, iteration = 1){
     var title = html.slice(indexoftitle, indexoftitle+100).split('"}')[0]
     songs.push({title:title, youtubelink:youtubelink})
   }
-  console.log(songs)
+  // console.log(songs)
   return songs.slice(-num)
 }
 
