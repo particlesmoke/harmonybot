@@ -1,179 +1,63 @@
 const puppeteer = require('puppeteer')
 const request = require('request-promise')
 const fetch = require('node-fetch')
-const fs = require('fs')
-const TelegramBot = require('node-telegram-bot-api')
-const { title } = require('process')
-const token = '1900703486:AAElE2nXiShEtnkkqi-43GJ4fzcPEMw-HS8'
-const bot = new TelegramBot(token, {polling: true})
-bot.setMyCommands([{command: "search", description:"Search for artist/album/song"}, {command: "song", description:"Download a song"}])
-
-async function sendmusicbyname(name, chatid, messageid) {
-  const browser = await puppeteer.launch({ headless: true});
-  try{
-    console.log("Browser launched")
-    const page = await browser.newPage()
-    bot.sendMessage(chatid, "◂◌◌◌▸")
-    const [song, response] = await Promise.all([
-      getsong(name),
-      page.goto('https://ytmp3.cc/downloader/')
-    ])
-    console.log("Copied link for "+ song.title)
-    console.log("On ytmp3")
-    console.log(song)
-    bot.sendMessage(chatid, "◂●◌◌▸")
-    await page.type('#input', `https://youtube.com${song.youtubelink}`)
-    await page.click('#submit')
-    console.log("Submitted youtube link")
-    bot.sendMessage(chatid, "◂●●◌▸")
-    await page.waitForTimeout(2000)
-    song.downloadlink = await page.evaluate(function(){
-      return document.querySelector('#buttons > a').getAttribute('href')
-    })
-    console.log("Got the download link")
-    console.log(song.downloadlink)
-    bot.sendMessage(chatid, "◂●●●▸")
-    bot.sendAudio(chatid, song.downloadlink, {reply_to_message_id: messageid}).then(()=>{
-      bot.sendMessage(chatid, "Here's "+ song.title)
-    })
-    await browser.close();
-  }
-  catch(err){
-    console.log("Got an error" + err)
-    bot.sendMessage(chatid, "I seem to have failed at that, please try again")
-    await browser.close();  
-  }
-}
-
-
-async function sendmusicbyurl(youtubelink, chatid){
-  const browser = await puppeteer.launch({ headless: true});
-  try{
-    console.log("Browser launched")
-    const page = await browser.newPage()
-    await page.goto('https://ytmp3.cc/downloader/')
-    await page.type('#input', youtubelink)
-    await page.click('#submit')
-    await page.waitForTimeout(2000)
-    const downloadlink = await page.evaluate(function(){
-      return document.querySelector('#buttons > a').getAttribute('href')
-    })
-    const title = await page.evaluate(function(){
-      return document.querySelector('#title').innerHTML
-    })
-    console.log(downloadlink)
-    bot.sendAudio(chatid, downloadlink).then(()=>{
-      bot.sendMessage(chatid, "Here's "+title)
-    })
-    await browser.close()
-  }
-  catch(err){
-    console.log("Got an error" + err)
-    bot.sendMessage(chatid, "I seem to have failed at that, please try again")
-    await browser.close();  
-  }
-}
-async function sendsearchresults(name, chatid, messageid, iteration, num = 9){
-  var songs = await getsongs(name, num + (iteration==3?1:0), iteration)
-  var reply = ""
-  var buttons = [[]]
-  let i = 0
-  for(i = 0; i<songs.length ; i++){
-    reply+= `|${i+1 + (iteration-1)*num}|` + songs[i].title+"\n"
-    buttons[Math.floor(i/5)].push({text:String(i+1 + (iteration-1)*num), callback_data:songs[i].youtubelink})
-    if((i+1)%5 == 0){
-      buttons.push([])
-    }
-  }
-  reply+="\n" + "Click on the song number you want to download" 
-  if(iteration<3){
-    buttons[Math.floor(i/5)].push({text:"More", callback_data:`/${name}/`+String(iteration+1)})
-  }
-  bot.sendMessage(chatid, reply, {reply_to_message_id: messageid, reply_markup: { inline_keyboard: buttons }})
-}
+const $ = require("./util")
+$.log("hello")
+const bot = $.bot
+var activesongrequests = []
 
 bot.on('callback_query', async query=>{
   // console.log(query)
-  console.log(query.data)
-  if(query.data[0] == '/'){
-    await sendsearchresults(query.data.split(`/`)[1],query.from.id,undefined,Number(query.data.split(`/`)[2]))
+  console.log("Query recieved: "+ query.data + " from " + query.from.id)
+  if(query.data.startsWith('search')){
+    await $.sendsearchresults(query.from.id, query.data.split(`search`)[1].split('/')[0],undefined,Number(query.data.split(`/`)[1]))
     bot.answerCallbackQuery(query.id)
-  }else{
-    await sendmusicbyurl(query.data, query.from.id)
+  }else if(query.data.startsWith('song')){
+    await $.sendmusicbyurl(query.from.id, query.data.slice(4))
     bot.answerCallbackQuery(query.id)
+  }
+  else if(query.data.startsWith('mood')){
+    $.sendplaylists(query.from.id, query.data.split('mood')[1])
   }
 })
 
 bot.on('message', async message=>{
   // console.log(message)
-  console.log( `${message.from.first_name} ${message.from.last_name} says ${message.text}`)
-  if('entities' in message && message.entities[0].type == 'bot_command'){ //do this with entities
-    if(message.text=="/start"){
-      bot.sendMessage(message.from.id, "Just send me the name of a song, and I'll try to get it to you : )")
+  const id = message.from.id
+  const text = message.text
+  console.log( `${message.from.first_name} ${message.from.last_name} ${id} says ${text}`)
+  if('entities' in message && message.entities[0].type == 'bot_command'){ //bot commands
+    if(text=="/start"){
+      bot.sendMessage(id, "Just send me the name of a song, and I'll try to get it to you : )")
     }
-    else if(message.text.startsWith("/search")){
-      bot.sendMessage(message.from.id, "What do you want to search for?")
-      bot.once('message', message=>{
-        sendsearchresults(message.text, message.from.id, message.message_id, 1)
-      })
+    else if(text.startsWith("/search")){
+      bot.sendMessage(id, "What do you want to search for? \u{1F601}")
+      $.activesearchrequests[id] = {term:""}
+      if(activesongrequests.includes(id)){
+        activesongrequests.slice(activesongrequests.indexOf(id), 1)
+      }
     }
-    else if(message.text.startsWith("/song")){
-      console.log("song requested")
-      bot.sendMessage(message.from.id, "Which song are you looking for?")
-      bot.once('message', message=>{
-        sendmusicbyname(message.text, message.from.id, message.message_id)
-      })
+    else if(text.startsWith("/song")){
+      bot.sendMessage(id, "Which song are you looking for?")
+      activesongrequests.push(id)
+      if(id in $.activesearchrequests){
+        delete $.activesearchrequests[id]
+      }
+    }
+    else if(text.startsWith("/moods")){
+      $.sendmoods(id, undefined)
     }
   }
   else{
-    // bot.sendMessage(message.from.id, "Please wait")
-    // sendmusicbyname(message.text, message.from.id, message.message_id)
-    
+    if(id in $.activesearchrequests){
+      $.activesearchrequests[id].term = text
+      $.sendsearchresults(id, text, message.message_id)
+    } 
+    else if(activesongrequests.includes(id)){
+      $.sendmusicbyname(id, text, message.message_id)
+      activesongrequests.splice(activesongrequests.indexOf(id),1)
+    }
   }
 })
 
 
-async function getsongs(input, num = 10, iteration = 1){
-  var searchterm = ""
-  input=input.split(" ")
-  for(let i = 0; i<input.length-1; i++){
-      searchterm+= (input[i]+'+')
-  }
-  searchterm+=input[input.length-1]
-  console.log("Getting results for "+searchterm)
-  const res = await request('https://youtube.com/results?search_query='+searchterm)
-  var songs = []
-  var html = String(res)
-  var lastindex = 0
-  for (let i = 0; i<num*iteration; i++){
-    const indexoftitle = html.indexOf('"title":{"runs":[{"text":', lastindex)+26
-    lastindex = indexoftitle
-    const indexoflink = html.indexOf("/watch?", indexoftitle)
-    var youtubelink = "https://youtube.com" + html.slice(indexoflink, indexoflink+20)
-    var title = html.slice(indexoftitle, indexoftitle+100).split('"}')[0]
-    songs.push({title:title, youtubelink:youtubelink})
-  }
-  // console.log(songs)
-  return songs.slice(-num)
-}
-
-async function getsong(input){
-  var searchterm = ""
-  input=input.split(" ")
-  for(let i = 0; i<input.length-1; i++){
-      searchterm+= (input[i]+'+')
-  }
-  searchterm+=input[input.length-1]
-  console.log(searchterm)
-
-  const res = await request('https://youtube.com/results?search_query='+searchterm)
-  var song = {}
-  var html = String(res)
-  // const data = fs.writeFileSync('./response.html', html)
-  const indexoflink = html.indexOf("/watch?")
-  const indexoftitle = html.indexOf('"title":{"runs":[{"text":')+26
-  song.youtubelink = "https://youtube.com" + html.slice(indexoflink, indexoflink+20)
-  song.title = html.slice(indexoftitle, indexoftitle+100).split('"}')[0]
-  // console.log(song)
-  return song
-}
