@@ -1,2 +1,3 @@
-# harmonybot
-[Use the bot!] (https://t.me/themusicfetcher_bot)
+# HarmonyBot
+
+[Use the bot](https://t.me/themusicfetcher_bot) right now!
