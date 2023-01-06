@@ -77,6 +77,7 @@ async function sendmusicbyname(chatid, name, messageid=undefined) {
 	sendmusicbyurl(chatid, song.youtubelink)
   }
   catch(err){
+	if(!browser.isConnected()) launchbrowser()
     console.log("Got an error" + err)
     bot.sendMessage(chatid, "I seem to have failed at that, please try again")
   }
@@ -117,6 +118,7 @@ async function sendmusicbyurl(chatid, youtubelink, isytmusic=false){
     await page.click('.button')
   }
   catch(err){
+	if(!browser.isConnected()) launchbrowser()
     console.log("Got an error" + err)
     bot.sendMessage(chatid, "I seem to have failed at that, please try again")
   }
@@ -161,7 +163,7 @@ async function sendmoods(chatid, messageid=undefined){
 		})
 		await page.goto("https://music.youtube.com/moods_and_genres", )
 		
-		await page.screenshot({path:'./here.png'})
+		// await page.screenshot({path:'./here.png'})
 		const moods = await page.evaluate(function(){
 		  const moodbuttons = document.querySelector('#contents #items').querySelectorAll('button')
 		  const moods = []
@@ -181,87 +183,103 @@ async function sendmoods(chatid, messageid=undefined){
 		bot.sendMessage(chatid,"Moods:", {reply_markup : {inline_keyboard : buttons}})
 	}
 	catch(err){
-		bot.sendMessage(chatid, 'I seem to have failed, please try again')
-		console.log(err)
+		if(!browser.isConnected()) launchbrowser()
+		console.log("Got an error" + err)
+		bot.sendMessage(chatid, "I seem to have failed at that, please try again")
 	}
 }
 
 async function sendplaylists(chatid, moodnumber){
-  const page = activemoodrequests[chatid].page
-  const moodbuttons= await (await page.$('#contents #items')).$$('button')
-  await moodbuttons[moodnumber].click()
-  await new Promise(x=>setTimeout(x, 3000))
-  const playlists = await page.evaluate(function(){
-    const elements = document.querySelector('#contents').children[1].querySelector('#items').children
-    const playlists = []
-    for(let i = 0; i<elements.length; i++){
-      elements[i].querySelectorAll('yt-formatted-string')[1].children[0].style.border = "solid red"
-      const listitem = {}
-      listitem['title'] = elements[i].querySelector('yt-formatted-string > a').innerHTML
-      var subtitle = ""
-      var subtitleelements = elements[i].querySelectorAll('yt-formatted-string')[1].children
-      for(let i = 0; i<subtitleelements.length;i++){
-        subtitle+=subtitleelements[i].innerHTML
-      }
-      listitem['subtitle'] = subtitle
-      listitem['link'] = elements[i].querySelector('yt-formatted-string > a').href
-      playlists.push(listitem)
-    }
-    return playlists
-  })
-  page.goBack()
-  var buttons = [[]]
-  for(let i =0; i<10; i++){
-    buttons[Math.floor(i/2)].push({text:playlists[i].title, callback_data:'play'+playlists[i].link.split('=')[1]})
-    if((i+1)%2 == 0){
-      buttons.push([])
-    }
-  }
-  bot.sendMessage(chatid,"Playlists:", {reply_markup : {inline_keyboard : buttons}})
+	try{
+		const page = activemoodrequests[chatid].page
+		const moodbuttons= await (await page.$('#contents #items')).$$('button')
+		await moodbuttons[moodnumber].click()
+		await new Promise(x=>setTimeout(x, 3000))
+		const playlists = await page.evaluate(function(){
+		  const elements = document.querySelector('#contents').children[1].querySelector('#items').children
+		  const playlists = []
+		  for(let i = 0; i<elements.length; i++){
+			elements[i].querySelectorAll('yt-formatted-string')[1].children[0].style.border = "solid red"
+			const listitem = {}
+			listitem['title'] = elements[i].querySelector('yt-formatted-string > a').innerHTML
+			var subtitle = ""
+			var subtitleelements = elements[i].querySelectorAll('yt-formatted-string')[1].children
+			for(let i = 0; i<subtitleelements.length;i++){
+			  subtitle+=subtitleelements[i].innerHTML
+			}
+			listitem['subtitle'] = subtitle
+			listitem['link'] = elements[i].querySelector('yt-formatted-string > a').href
+			playlists.push(listitem)
+		  }
+		  return playlists
+		})
+		page.goBack()
+		var buttons = [[]]
+		for(let i =0; i<10; i++){
+		  buttons[Math.floor(i/2)].push({text:playlists[i].title, callback_data:'play'+playlists[i].link.split('=')[1]})
+		  if((i+1)%2 == 0){
+			buttons.push([])
+		  }
+		}
+		bot.sendMessage(chatid,"Playlists:", {reply_markup : {inline_keyboard : buttons}})
+	}
+	catch(err){
+		if(!browser.isConnected()) launchbrowser()
+		console.log("Got an error" + err)
+		bot.sendMessage(chatid, "I seem to have failed at that, please try again")
+	}
 }
 
 async function sendplaylist(chatid, playlistid){
-	const page = await browser.newPage()
-	page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67')
-	await page.setRequestInterception(true)
-	page.on('request', request=>{
-		if (['image', 'stylesheet', 'font'].indexOf(request.resourceType()) != -1) {
-			request.abort();
-		} 
-		else{
-			request.continue();
+	try{
+
+		const page = await browser.newPage()
+		page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67')
+		await page.setRequestInterception(true)
+		page.on('request', request=>{
+			if (['image', 'stylesheet', 'font'].indexOf(request.resourceType()) != -1) {
+				request.abort();
+			} 
+			else{
+				request.continue();
+			}
+		})
+		await page.goto("https://music.youtube.com/playlist?list="+playlistid)
+		console.log("https://music.youtube.com/playlist?list="+playlistid)
+		await new Promise(x=>setTimeout(x, 3000))
+		const songs = await page.evaluate(()=>{
+			const elements = document.querySelector('ytmusic-playlist-shelf-renderer > #contents').children
+			const songs = []
+			for(let i = 0; i<elements.length; i++){
+				elements[i].querySelectorAll('yt-formatted-string')[0].style.border = "solid red"
+				elements[i].querySelectorAll('yt-formatted-string')[1].style.border = "solid red"
+				const listitem = {}
+				listitem['title'] = elements[i].querySelectorAll('yt-formatted-string > a')[0].innerHTML
+				listitem['subtitle'] = elements[i].querySelectorAll('yt-formatted-string > a')[1].innerHTML
+				// var subtitle = ""
+				// var subtitleelements = elements[i].querySelectorAll('yt-formatted-string')[1].children
+				// for(let i = 0; i<subtitleelements.length;i++){
+				// 	subtitle+=subtitleelements[i].innerHTML
+				// }
+				// listitem['subtitle'] = subtitle
+				listitem['link'] = elements[i].querySelectorAll('yt-formatted-string > a')[0].href
+				songs.push(listitem)
+			}
+			return songs
+		})
+		// console.log(songs)
+		const buttons = []
+		for(let i = 0; i<9; i++){
+			buttons.push([{text:songs[i].title, callback_data:'songm'+songs[i].link.split('=')[1]}])
 		}
-	})
-	await page.goto("https://music.youtube.com/playlist?list="+playlistid)
-	console.log("https://music.youtube.com/playlist?list="+playlistid)
-	await new Promise(x=>setTimeout(x, 3000))
-	const songs = await page.evaluate(()=>{
-		const elements = document.querySelector('ytmusic-playlist-shelf-renderer > #contents').children
-		const songs = []
-		for(let i = 0; i<elements.length; i++){
-			elements[i].querySelectorAll('yt-formatted-string')[0].style.border = "solid red"
-			elements[i].querySelectorAll('yt-formatted-string')[1].style.border = "solid red"
-			const listitem = {}
-			listitem['title'] = elements[i].querySelectorAll('yt-formatted-string > a')[0].innerHTML
-			listitem['subtitle'] = elements[i].querySelectorAll('yt-formatted-string > a')[1].innerHTML
-			// var subtitle = ""
-			// var subtitleelements = elements[i].querySelectorAll('yt-formatted-string')[1].children
-			// for(let i = 0; i<subtitleelements.length;i++){
-			// 	subtitle+=subtitleelements[i].innerHTML
-			// }
-			// listitem['subtitle'] = subtitle
-			listitem['link'] = elements[i].querySelectorAll('yt-formatted-string > a')[0].href
-			songs.push(listitem)
-		}
-		return songs
-	})
-	// console.log(songs)
-	const buttons = []
-	for(let i = 0; i<9; i++){
-		buttons.push([{text:songs[i].title, callback_data:'songm'+songs[i].link.split('=')[1]}])
+		console.log(buttons)
+		bot.sendMessage(chatid,"Playlists songs:", {reply_markup : {inline_keyboard : buttons}})
 	}
-	console.log(buttons)
-	bot.sendMessage(chatid,"Playlists songs:", {reply_markup : {inline_keyboard : buttons}})
+	catch(err){
+		if(!browser.isConnected()) launchbrowser()
+		console.log("Got an error" + err)
+		bot.sendMessage(chatid, "I seem to have failed at that, please try again")
+	}
 
 }
 
