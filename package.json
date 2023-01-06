@@ -9,15 +9,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.18.2",
     "fs": "0.0.1-security",
     "node-fetch": "^2.6.7",
     "node-telegram-bot-api": "^0.54.0",
     "nodemon": "^2.0.12",
     "puppeteer": "^2.1.1",
     "request": "^2.88.2",
-    "request-promise": "^4.2.6",
-    "uuid4": "^2.0.3",
-    "youtube-dl-exec": "^2.1.11"
+    "request-promise": "^4.2.6"
   }
 }

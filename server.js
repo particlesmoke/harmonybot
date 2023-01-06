@@ -12,12 +12,20 @@ bot.on('callback_query', async query=>{
   if(query.data.startsWith('search')){
     await $.sendsearchresults(query.from.id, query.data.split(`search`)[1].split('/')[0],undefined,Number(query.data.split(`/`)[1]))
     bot.answerCallbackQuery(query.id)
-  }else if(query.data.startsWith('song')){
+  }
+  else if(query.data.startsWith('songm')){
+    await $.sendmusicbyurl(query.from.id, query.data.slice(5), true)
+    bot.answerCallbackQuery(query.id)
+  }
+  else if(query.data.startsWith('song')){
     await $.sendmusicbyurl(query.from.id, query.data.slice(4))
     bot.answerCallbackQuery(query.id)
   }
   else if(query.data.startsWith('mood')){
     $.sendplaylists(query.from.id, query.data.split('mood')[1])
+  }
+  else if(query.data.startsWith('play')){
+    $.sendplaylist(query.from.id, query.data.split('play')[1])
   }
 })
 
