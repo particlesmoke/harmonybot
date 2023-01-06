@@ -83,7 +83,8 @@ async function sendmusicbyname(chatid, name, messageid=undefined) {
     await page.type('#input', `https://youtube.com${song.youtubelink}`)
     await page.click('#submit')
     bot.sendMessage(chatid, "◂●●◌▸")
-    await page.waitForTimeout(2000)
+    // await page.waitForTimeout(2000)
+	await new Promise(x=>setTimeout(x, 2000))
     song.downloadlink = await page.evaluate(function(){
       return document.querySelector('#buttons > a').getAttribute('href')
     })
@@ -104,32 +105,54 @@ async function sendmusicbyurl(chatid, youtubelink){
     console.log("Sending music by url to "+chatid)
     const page = await browser.newPage()
     await page.setRequestInterception(true);
-    page.on('request', request=>{
-      if (['image', 'stylesheet', 'font'].indexOf(request.resourceType()) !== -1) {
+    page.on('request', async (request)=>{
+      if (['image', 'font', 'stylesheet'].indexOf(request.resourceType()) !== -1) {
         request.abort();
       } 
       else{
-        request.continue();
+		  request.continue();
+		  if(request._url.endsWith('1.html')){
+			const downloadlink = await page.evaluate(function(){
+				return document.querySelector('#download > a').getAttribute('href')
+			  })
+			  const title = await page.evaluate(function(){
+				return document.querySelector('#form > label').innerHTML
+			  })
+			  await page.close()
+			  console.log('download link: '+downloadlink)
+			  bot.sendAudio(chatid, downloadlink).then(()=>{
+				  bot.sendMessage(chatid, "Here's "+title)
+			  }).catch((err)=>{
+				console.log("Got an error" + err)
+				bot.sendMessage(chatid, "I seem to have failed at that, please try again")
+			  })
+		  }
       }
     })
-    await page.goto('https://ytmp3.cc/downloader/')
-    await page.type('#input', youtubelink)
-    await page.click('#submit')
-    await page.waitForTimeout(2000)
-    const downloadlink = await page.evaluate(function(){
-      return document.querySelector('#buttons > a').getAttribute('href')
-    })
-    const title = await page.evaluate(function(){
-      return document.querySelector('#title').innerHTML
-    })
-    await page.close()
-    console.log(downloadlink)
-    bot.sendAudio(chatid, downloadlink).then(()=>{
-      bot.sendMessage(chatid, "Here's "+title)
-    }).catch((err)=>{
-      console.log("Got an error" + err)
-      bot.sendMessage(chatid, "I seem to have failed at that, please try again")
-    })
+	// browser.on('targetcreated', async (target) => {
+	// 	let s = target.url()
+	// 	console.log(s)
+	// })
+    await page.goto('https://ytmp3.nu/')
+    await page.type('#url', youtubelink)
+    await page.click('.button')
+    // await page.waitForTimeout(2000)
+	// await new Promise(x=>setTimeout(x, 5000))
+	// page.click('#download_list>div')
+    // const downloadlink = await page.evaluate(function(){
+    //   return document.querySelector('#download > a').getAttribute('href')
+    // })
+    // const title = await page.evaluate(function(){
+    //   return document.querySelector('#form > label').innerHTML
+    // })
+    // await page.close()
+    // console.log('download link: '+downloadlink)
+    // bot.sendAudio(chatid, downloadlink).then(()=>{
+	// 	bot.sendMessage(chatid, "Here's "+title)
+    // }).catch((err)=>{
+    //   console.log("Got an error" + err)
+    //   bot.sendMessage(chatid, "I seem to have failed at that, please try again")
+    // })
   }
   catch(err){
     console.log("Got an error" + err)
