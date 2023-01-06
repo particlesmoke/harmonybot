@@ -4,7 +4,7 @@ const token = '1900703486:AAElE2nXiShEtnkkqi-43GJ4fzcPEMw-HS8'
 const bot = new TelegramBot(token, {polling: true})
 bot.setMyCommands([{command: "song", description:"Download a song"}, {command: "search", description:"Search for artist/album/song"}, {command: "moods", description:"Explore music according to mood"}])
 const request = require('request-promise')
-const youtubedl = require('youtube-dl-exec')
+// const youtubedl = require('youtube-dl-exec')
 const express = require('express')
 const app = express()
 const server = require('http').createServer(app)
@@ -16,7 +16,11 @@ var activemoodrequests = {}
 
 var browser = ""
 async function launchbrowser(){
-  browser = await puppeteer.launch({headless:true})
+//   browser = await puppeteer.launch({headless:true})
+  browser = await puppeteer.connect({
+	browserWSEndpoint: 'browserless-production-72c2.up.railway.app', 
+	headless: true
+  });
 }
 // launchbrowser()
 
@@ -111,63 +115,63 @@ async function sendmusicbyname(chatid, name, messageid=undefined) {
 
 async function sendmusicbyurl(chatid, youtubelink){
 	console.log('here')
-	youtubedl(youtubelink, {
-	dumpSingleJson: true,
-	noCheckCertificates: true,
-	noWarnings: true,
-	// listFormats:true
-	f:'m4a',
-	o:'audio.m4a'
-	}).then(output => {
-		// console.log('a',output)
-		// console.log('b',output.requested_downloads)
-		console.log('c',output?.requested_downloads[0].url)
-		// console.log('c',output?.requested_downloads[0]?.requested_formats.find(x=>x.format!=null && x.format.includes('audio')).url)
-		const downloadlink = 'harmonybot-production.up.railway.app/'+createDownloadLink(output?.requested_downloads[0].url)
+	// youtubedl(youtubelink, {
+	// dumpSingleJson: true,
+	// noCheckCertificates: true,
+	// noWarnings: true,
+	// // listFormats:true
+	// f:'m4a',
+	// o:'audio.m4a'
+	// }).then(output => {
+	// 	// console.log('a',output)
+	// 	// console.log('b',output.requested_downloads)
+	// 	console.log('c',output?.requested_downloads[0].url)
+	// 	// console.log('c',output?.requested_downloads[0]?.requested_formats.find(x=>x.format!=null && x.format.includes('audio')).url)
+	// 	const downloadlink = 'harmonybot-production.up.railway.app/'+createDownloadLink(output?.requested_downloads[0].url)
 		
-		bot.sendAudio(chatid, downloadlink).then(()=>{
-			bot.sendMessage(chatid, "Here's the audio")
-		}).catch((err)=>{
-			console.log("Got an error" + err)
-			bot.sendMessage(chatid, "I seem to have failed at that, please try again")
-		})
-	})
-//   try{
-//     console.log("Sending music by url to "+chatid)
-//     const page = await browser.newPage()
-//     await page.setRequestInterception(true);
-//     page.on('request', async (request)=>{
-//       if (['image', 'font', 'stylesheet'].indexOf(request.resourceType()) !== -1) {
-//         request.abort();
-//       } 
-//       else{
-// 		  request.continue();
-// 		  if(request._url.endsWith('1.html')){
-// 			const downloadlink = await page.evaluate(function(){
-// 				return document.querySelector('#download > a').getAttribute('href')
-// 			  })
-// 			  const title = await page.evaluate(function(){
-// 				return document.querySelector('#form > label').innerHTML
-// 			  })
-// 			  await page.close()
-// 			  console.log('download link: '+downloadlink)
-// 			  bot.sendAudio(chatid, downloadlink).then(()=>{
-// 				  bot.sendMessage(chatid, "Here's "+title)
-// 			  }).catch((err)=>{
-// 				console.log("Got an error" + err)
-// 				bot.sendMessage(chatid, "I seem to have failed at that, please try again")
-// 			  })
-// 		  }
-//       }
-//     })
-//     await page.goto('https://ytmp3.nu/')
-//     await page.type('#url', youtubelink)
-//     await page.click('.button')
-//   }
-//   catch(err){
-//     console.log("Got an error" + err)
-//     bot.sendMessage(chatid, "I seem to have failed at that, please try again")
-//   }
+	// 	bot.sendAudio(chatid, downloadlink).then(()=>{
+	// 		bot.sendMessage(chatid, "Here's the audio")
+	// 	}).catch((err)=>{
+	// 		console.log("Got an error" + err)
+	// 		bot.sendMessage(chatid, "I seem to have failed at that, please try again")
+	// 	})
+	// })
+  try{
+    console.log("Sending music by url to "+chatid)
+    const page = await browser.newPage()
+    await page.setRequestInterception(true);
+    page.on('request', async (request)=>{
+      if (['image', 'font', 'stylesheet'].indexOf(request.resourceType()) !== -1) {
+        request.abort();
+      } 
+      else{
+		  request.continue();
+		  if(request._url.endsWith('1.html')){
+			const downloadlink = await page.evaluate(function(){
+				return document.querySelector('#download > a').getAttribute('href')
+			  })
+			  const title = await page.evaluate(function(){
+				return document.querySelector('#form > label').innerHTML
+			  })
+			  await page.close()
+			  console.log('download link: '+downloadlink)
+			  bot.sendAudio(chatid, downloadlink).then(()=>{
+				  bot.sendMessage(chatid, "Here's "+title)
+			  }).catch((err)=>{
+				console.log("Got an error" + err)
+				bot.sendMessage(chatid, "I seem to have failed at that, please try again")
+			  })
+		  }
+      }
+    })
+    await page.goto('https://ytmp3.nu/')
+    await page.type('#url', youtubelink)
+    await page.click('.button')
+  }
+  catch(err){
+    console.log("Got an error" + err)
+    bot.sendMessage(chatid, "I seem to have failed at that, please try again")
+  }
 }
 async function sendsearchresults(chatid, name, messageid=undefined, iteration=1, num = 9){
   if(iteration==1){
