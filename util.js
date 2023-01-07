@@ -16,7 +16,7 @@ async function launchbrowser(){
 		browserWSEndpoint: 'https://browserless-production-72c2.up.railway.app'
 	//   browserWSEndpoint: 'wss://chrome.browserless.io?token=a8b718c5-02ab-46c2-bc24-7afa3773659c'
 	});
-	browser.on('disconnected', async ()=>{
+	browser.once('disconnected', async ()=>{
 		launchbrowser()
 	})
 }
@@ -77,7 +77,6 @@ async function sendmusicbyname(chatid, name, messageid=undefined) {
 	sendmusicbyurl(chatid, song.youtubelink)
   }
   catch(err){
-	if(!browser.isConnected()) launchbrowser()
     console.log("Got an error" + err)
     bot.sendMessage(chatid, "I seem to have failed at that, please try again")
   }
@@ -85,6 +84,7 @@ async function sendmusicbyname(chatid, name, messageid=undefined) {
 
 async function sendmusicbyurl(chatid, youtubelink, isytmusic=false){
   try{
+	if(!browser.isConnected()) await launchbrowser()
 	bot.sendMessage(chatid, 'This may take upto a minute')
     console.log("Sending music by url to "+chatid)
     const page = await browser.newPage()
@@ -149,6 +149,7 @@ async function sendsearchresults(chatid, name, messageid=undefined, iteration=1,
 }
 async function sendmoods(chatid, messageid=undefined){
 	try{
+		if(!browser.isConnected()) await launchbrowser()
 		const page = await browser.newPage()
 		activemoodrequests[chatid] = {page:page}
 		page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67')
@@ -191,6 +192,7 @@ async function sendmoods(chatid, messageid=undefined){
 
 async function sendplaylists(chatid, moodnumber){
 	try{
+		if(!browser.isConnected()) await launchbrowser()
 		const page = activemoodrequests[chatid].page
 		const moodbuttons= await (await page.$('#contents #items')).$$('button')
 		await moodbuttons[moodnumber].click()
@@ -232,7 +234,7 @@ async function sendplaylists(chatid, moodnumber){
 
 async function sendplaylist(chatid, playlistid){
 	try{
-
+		if(!browser.isConnected()) await launchbrowser()
 		const page = await browser.newPage()
 		page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67')
 		await page.setRequestInterception(true)
@@ -256,12 +258,6 @@ async function sendplaylist(chatid, playlistid){
 				const listitem = {}
 				listitem['title'] = elements[i].querySelectorAll('yt-formatted-string > a')[0].innerHTML
 				listitem['subtitle'] = elements[i].querySelectorAll('yt-formatted-string > a')[1].innerHTML
-				// var subtitle = ""
-				// var subtitleelements = elements[i].querySelectorAll('yt-formatted-string')[1].children
-				// for(let i = 0; i<subtitleelements.length;i++){
-				// 	subtitle+=subtitleelements[i].innerHTML
-				// }
-				// listitem['subtitle'] = subtitle
 				listitem['link'] = elements[i].querySelectorAll('yt-formatted-string > a')[0].href
 				songs.push(listitem)
 			}
