@@ -270,7 +270,7 @@ async function sendplaylist(chatid, playlistid){
 		// console.log(songs)
 		const buttons = []
 		for(let i = 0; i<9; i++){
-			buttons.push([{text:songs[i].title, callback_data:'songm'+songs[i].link.split('=')[1]}])
+			buttons.push([{text:songs[i].title, callback_data:'songm'+songs[i].link.split('=')[1].split('&')[0]}])
 		}
 		console.log(buttons)
 		bot.sendMessage(chatid,"Playlists songs:", {reply_markup : {inline_keyboard : buttons}})
