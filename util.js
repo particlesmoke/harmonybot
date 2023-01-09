@@ -11,7 +11,7 @@ var activemoodrequests = {}
 
 var browser
 async function launchbrowser(){
-//   browser = await puppeteer.launch({headless:true})
+//   browser = await puppeteer.launch({headless:false})
 	browser = await puppeteer.connect({
 		browserWSEndpoint: 'https://browserless-production-72c2.up.railway.app'
 	//   browserWSEndpoint: 'wss://chrome.browserless.io?token=a8b718c5-02ab-46c2-bc24-7afa3773659c'
@@ -115,7 +115,7 @@ async function sendmusicbyurl(chatid, youtubelink, isytmusic=false){
     })
     await page.goto('https://ytmp3.nu/')
     await page.type('#url', isytmusic==false?youtubelink:'https://music.youtube.com/watch?v='+youtubelink)
-    await page.click('.button')
+    await page.click(	'[value="Convert"]'	)
   }
   catch(err){
 	if(!browser.isConnected()) launchbrowser()
@@ -171,7 +171,6 @@ async function sendmoods(chatid, messageid=undefined){
 		  for(let i = 0; i<moodbuttons.length; i++){
 			  moods.push({name:moodbuttons[i].lastElementChild.innerHTML, buttonindex:i})
 		  }
-		  console.log(moods)
 		  return moods
 		})
 		var buttons = [[]]
@@ -247,7 +246,6 @@ async function sendplaylist(chatid, playlistid){
 			}
 		})
 		await page.goto("https://music.youtube.com/playlist?list="+playlistid)
-		console.log("https://music.youtube.com/playlist?list="+playlistid)
 		await new Promise(x=>setTimeout(x, 3000))
 		const songs = await page.evaluate(()=>{
 			const elements = document.querySelector('ytmusic-playlist-shelf-renderer > #contents').children
@@ -268,7 +266,6 @@ async function sendplaylist(chatid, playlistid){
 		for(let i = 0; i<9; i++){
 			buttons.push([{text:songs[i].title, callback_data:'songm'+songs[i].link.split('=')[1].split('&')[0]}])
 		}
-		console.log(buttons)
 		bot.sendMessage(chatid,"Playlists songs:", {reply_markup : {inline_keyboard : buttons}})
 	}
 	catch(err){

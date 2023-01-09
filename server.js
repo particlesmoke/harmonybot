@@ -55,6 +55,9 @@ bot.on('message', async message=>{
     else if(text.startsWith("/moods")){
       $.sendmoods(id, undefined)
     }
+	else{
+		bot.sendMessage(id, 'Please select a command from the menu')
+	}
   }
   else{
     if(id in $.activesearchrequests){
